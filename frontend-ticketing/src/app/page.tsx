@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
   buyTicket,
   requestRefund,
-  redeemRefund,
+  redeemTicket,
   getTicket,
   getStats,
 } from "@/lib/contract";
@@ -18,9 +18,10 @@ function isValidStellarAddress(addr: string) {
 export default function TicketDashboard() {
   const [buyer, setBuyer] = useState("");
   const [price, setPrice] = useState("");
-  const [ticketId, setTicketId] = useState("");
+  const [ticketIdRedeem, setTicketIdRedeem] = useState("");
+  const [ticketIdRefund, setTicketIdRefund] = useState("");
   const [tickets, setTickets] = useState<any[]>([]);
-  const [stats, setStats] = useState({ sales: 0, refunds: 0 });
+  const [stats, setStats] = useState({ sales: 0, refunds: 0, redeem: 0 });
   const [tab, setTab] = useState<"buy" | "refund" | "redeem">("buy");
   const [message, setMessage] = useState("");
 
@@ -30,19 +31,19 @@ export default function TicketDashboard() {
       setMessage("❌ Freighter not installed or inactive");
       return;
     }
-  
+
     const access = await requestAccess();
-  
+
     if (access.error) {
       setMessage("❌ User denied access: " + access.error);
       return;
     }
-  
+
     if (!access.address) {
       setMessage("❌ No address returned. Try refreshing the page.");
       return;
     }
-  
+
     setBuyer(access.address);
     setMessage(`Connected: ${access.address}`);
   }
@@ -54,6 +55,7 @@ export default function TicketDashboard() {
       setStats({
         sales: res.totalSales,
         refunds: res.totalRefunds,
+        redeem: res.totalRedeem,
       });
     } catch {
       setMessage("Failed to fetch stats");
@@ -61,17 +63,20 @@ export default function TicketDashboard() {
   }
 
   async function refreshTickets() {
-    if (!isValidStellarAddress(buyer)) return;
+    if (!isValidStellarAddress(buyer))
+      return setMessage("Invalid wallet address.");
 
     const arr: any[] = [];
 
-    for (let id = 0; id < stats.sales; id++) {
+    for (let id = 0; id <= stats.sales; id++) {
       try {
         const t = await getTicket(id);
-        if (t?.owner === buyer) arr.push({ id, ...t });
-      } catch {
-        // ignore errors for non-existing tickets
-      }
+        if (!t) continue;
+
+        const owner = String(t.owner);
+
+        if (owner === buyer) arr.push({ id, ...t });
+      } catch { }
     }
 
     setTickets(arr);
@@ -84,6 +89,7 @@ export default function TicketDashboard() {
     try {
       const id = await buyTicket(buyer, price);
       setMessage(`🎉 Bought ticket ID: ${id}`);
+      setPrice("")
 
       await refreshStats();
       await refreshTickets();
@@ -96,10 +102,10 @@ export default function TicketDashboard() {
     if (!isValidStellarAddress(buyer))
       return setMessage("Invalid wallet address.");
 
-    if (!ticketId) return setMessage("Please enter Ticket ID");
+    if (!ticketIdRefund) return setMessage("Please enter Ticket ID");
 
     try {
-      await requestRefund(buyer, Number(ticketId));
+      await requestRefund(buyer, Number(ticketIdRefund));
       setMessage("Refund requested ✔");
 
       await refreshTickets();
@@ -112,10 +118,10 @@ export default function TicketDashboard() {
     if (!isValidStellarAddress(buyer))
       return setMessage("Invalid wallet address.");
 
-    if (!ticketId) return setMessage("Please enter Ticket ID");
+    if (!ticketIdRedeem) return setMessage("Please enter Ticket ID");
 
     try {
-      const amount = await redeemRefund(buyer, Number(ticketId));
+      const amount = await redeemTicket(buyer, Number(ticketIdRedeem));
       setMessage(`💰 Refund redeemed: ${amount}`);
 
       await refreshTickets();
@@ -127,9 +133,14 @@ export default function TicketDashboard() {
   useEffect(() => {
     if (isValidStellarAddress(buyer)) {
       refreshStats();
-      refreshTickets();
     }
   }, [buyer]);
+
+  useEffect(() => {
+    if (stats.sales > 0) {
+      refreshTickets();
+    }
+  }, [stats]);
 
   return (
     <main className="grid grid-cols-1 md:grid-cols-2 gap-10 p-10 min-h-screen bg-gray-50">
@@ -187,8 +198,8 @@ export default function TicketDashboard() {
             <input
               className="border p-2 rounded w-full mb-3"
               placeholder="Ticket ID"
-              value={ticketId}
-              onChange={(e) => setTicketId(e.target.value)}
+              value={ticketIdRefund}
+              onChange={(e) => setTicketIdRefund(e.target.value)}
             />
             <button
               className="bg-yellow-500 text-white p-2 rounded w-full"
@@ -201,18 +212,18 @@ export default function TicketDashboard() {
 
         {tab === "redeem" && (
           <div>
-            <h2 className="font-semibold text-xl mb-2">Redeem Refund</h2>
+            <h2 className="font-semibold text-xl mb-2">Redeem Ticket</h2>
             <input
               className="border p-2 rounded w-full mb-3"
               placeholder="Ticket ID"
-              value={ticketId}
-              onChange={(e) => setTicketId(e.target.value)}
+              value={ticketIdRedeem}
+              onChange={(e) => setTicketIdRedeem(e.target.value)}
             />
             <button
               className="bg-green-600 text-white p-2 rounded w-full"
               onClick={handleRedeem}
             >
-              Redeem Refund
+              Redeem
             </button>
           </div>
         )}
@@ -238,7 +249,7 @@ export default function TicketDashboard() {
               <div>
                 <p className="font-semibold">Ticket ID: {t.id}</p>
                 <p>Price: {t.price}</p>
-                <p>Status: {t.refunded ? "Refunded" : "Active"}</p>
+                <p>Status: {t.refunded ? "Refunded" : t.redeemed ? "Redeemed" : "Active"}</p>
               </div>
             </div>
           ))}
@@ -247,6 +258,7 @@ export default function TicketDashboard() {
         <h3 className="text-xl font-semibold mt-8 mb-1">📊 Stats</h3>
         <p>Total Sales: {stats.sales}</p>
         <p>Total Refunds: {stats.refunds}</p>
+        <p>Total Redeem: {stats.redeem}</p>
       </div>
     </main>
   );

@@ -16,19 +16,21 @@ export async function requestRefund(caller: string, ticketId: number) {
     return await contractInvoke(caller, "request_refund", args);
 }
 
-export async function redeemRefund(caller: string, ticketId: number) {
-    const args = [toAddr(caller), u32(ticketId)];
-    const amount = await contractInvoke(caller, "redeem_refund", args);
-    return Number(amount);
+export async function redeemTicket(user: string, ticketId: number) {
+    const args = [toAddr(user), u32(ticketId)];
+    await contractInvoke(user, "redeem_ticket", args);
+    return true;
 }
 
 export async function getTicket(ticketId: number) {
-    const res = await contractRead("get_ticket", u32(ticketId));
-    if (!res) return null;
+    const result = await contractRead("get_ticket", u32(ticketId));
+    if (!result) return null;
+
     return {
-        owner: res.owner,
-        price: Number(res.price),
-        refunded: res.refunded,
+        owner: String(result.owner),
+        price: Number(result.price),
+        refunded: Boolean(result.refunded),
+        redeemed: Boolean(result.used)
     };
 }
 
@@ -37,5 +39,6 @@ export async function getStats() {
     return {
         totalSales: Number(res[0]),
         totalRefunds: Number(res[1]),
+        totalRedeem: Number(res[2])
     };
 }
