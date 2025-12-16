@@ -67,6 +67,7 @@ rustup target add wasm32-unknown-unknown
 
 ## Documentation:
 [Documentation Developer](https://developers.stellar.org/docs/build/smart-contracts/getting-started)
+*notes: **You can find more spesific tutorial in the documentation**
 
 ### 2️⃣ Install Dependencies
 
@@ -84,7 +85,7 @@ npm install
 
 ### 3️⃣ Build the Smart Contract
 ```bash
-soroban contract build
+stellar contract build
 ```
 
 ## WASM file output:
@@ -94,7 +95,7 @@ target/wasm32-unknown-unknown/release/<contract_name>.wasm
 
 ### 4️⃣ Deploy to Stellar Testnet
 ```bash
-soroban contract deploy \
+stellar contract deploy \
   --wasm target/wasm32-unknown-unknown/release/<contract_name>.wasm \
   --source-account <YOUR_TESTNET_WALLET> \
   --network testnet
