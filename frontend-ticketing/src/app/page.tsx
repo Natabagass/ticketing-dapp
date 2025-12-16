@@ -1,146 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  buyTicket,
-  requestRefund,
-  redeemTicket,
-  getTicket,
-  getStats,
-} from "@/lib/contract";
-
-import { requestAccess, isConnected } from "@stellar/freighter-api";
-
-function isValidStellarAddress(addr: string) {
-  return typeof addr === "string" && addr.startsWith("G") && addr.length === 56;
-}
+import { useFunction } from "@/hooks/useFunction";
+import { useVariable } from "@/hooks/useVariable";
 
 export default function TicketDashboard() {
-  const [buyer, setBuyer] = useState("");
-  const [price, setPrice] = useState("");
-  const [ticketIdRedeem, setTicketIdRedeem] = useState("");
-  const [ticketIdRefund, setTicketIdRefund] = useState("");
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [stats, setStats] = useState({ sales: 0, refunds: 0, redeem: 0 });
-  const [tab, setTab] = useState<"buy" | "refund" | "redeem">("buy");
-  const [message, setMessage] = useState("");
+  const state = useVariable();
+  const fn = useFunction(state);
 
-  async function connectWallet() {
-    const ok = await isConnected();
-    if (!ok) {
-      setMessage("❌ Freighter not installed or inactive");
-      return;
-    }
+  const {
+    buyer,
+    tickets,
+    stats,
+    message,
+    setTab,
+    tab,
+    price,
+    setPrice,
+    ticketIdRefund,
+    ticketIdRedeem,
+    setTicketIdRedeem,
+    setTicketIdRefund
+  } = state;
 
-    const access = await requestAccess();
-
-    if (access.error) {
-      setMessage("❌ User denied access: " + access.error);
-      return;
-    }
-
-    if (!access.address) {
-      setMessage("❌ No address returned. Try refreshing the page.");
-      return;
-    }
-
-    setBuyer(access.address);
-    setMessage(`Connected: ${access.address}`);
-  }
-
-
-  async function refreshStats() {
-    try {
-      const res = await getStats();
-      setStats({
-        sales: res.totalSales,
-        refunds: res.totalRefunds,
-        redeem: res.totalRedeem,
-      });
-    } catch {
-      setMessage("Failed to fetch stats");
-    }
-  }
-
-  async function refreshTickets() {
-    if (!isValidStellarAddress(buyer))
-      return setMessage("Invalid wallet address.");
-
-    const arr: any[] = [];
-
-    for (let id = 0; id <= stats.sales; id++) {
-      try {
-        const t = await getTicket(id);
-        if (!t) continue;
-
-        const owner = String(t.owner);
-
-        if (owner === buyer) arr.push({ id, ...t });
-      } catch { }
-    }
-
-    setTickets(arr);
-  }
-
-  async function handleBuy() {
-    if (!isValidStellarAddress(buyer))
-      return setMessage("Invalid wallet address.");
-
-    try {
-      const id = await buyTicket(buyer, price);
-      setMessage(`🎉 Bought ticket ID: ${id}`);
-      setPrice("")
-
-      await refreshStats();
-      await refreshTickets();
-    } catch (err: any) {
-      setMessage(err.message || "Buy failed.");
-    }
-  }
-
-  async function handleRefund() {
-    if (!isValidStellarAddress(buyer))
-      return setMessage("Invalid wallet address.");
-
-    if (!ticketIdRefund) return setMessage("Please enter Ticket ID");
-
-    try {
-      await requestRefund(buyer, Number(ticketIdRefund));
-      setMessage("Refund requested ✔");
-
-      await refreshTickets();
-    } catch (err: any) {
-      setMessage(err.message || "Refund failed.");
-    }
-  }
-
-  async function handleRedeem() {
-    if (!isValidStellarAddress(buyer))
-      return setMessage("Invalid wallet address.");
-
-    if (!ticketIdRedeem) return setMessage("Please enter Ticket ID");
-
-    try {
-      const amount = await redeemTicket(buyer, Number(ticketIdRedeem));
-      setMessage(`💰 Refund redeemed: ${amount}`);
-
-      await refreshTickets();
-    } catch (err: any) {
-      setMessage(err.message || "Redeem failed.");
-    }
-  }
-
-  useEffect(() => {
-    if (isValidStellarAddress(buyer)) {
-      refreshStats();
-    }
-  }, [buyer]);
-
-  useEffect(() => {
-    if (stats.sales > 0) {
-      refreshTickets();
-    }
-  }, [stats]);
+  const {
+    handleBuy,
+    handleRefund,
+    handleRedeem,
+    connectWallet
+  } = fn;
 
   return (
     <main className="grid grid-cols-1 md:grid-cols-2 gap-10 p-10 min-h-screen bg-gray-50">
