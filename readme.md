@@ -46,6 +46,9 @@ Below are the complete steps to run both the smart contract and the frontend, wr
 
 ## 1️⃣ Install Required Tools
 
+## Download freighter wallet using extension
+[Link Freighter](https://www.freighter.app/)
+
 ## Install Rust:
 ```bash
 curl https://sh.rustup.rs -sSf | sh
